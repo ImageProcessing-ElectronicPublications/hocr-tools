@@ -34,7 +34,6 @@ from reportlab.pdfgen.canvas import Canvas
 from lxml import etree, html
 from PIL import Image
 
-
 class StdoutWrapper:
     """Wrapper around stdout that ensures 'bytes' data is decoded.
 
@@ -48,11 +47,13 @@ class StdoutWrapper:
             data = data.decode('latin1')
         sys.stdout.write(data)
 
-
-def export_pdf(playground, default_dpi, hocrext,
-               timgs, outfile, nodraw, readdpi, viewmark):
+def export_pdf(playground, default_dpi, hocrext, nfont,
+               timgs, outfile, nodraw, readdpi, viewtxt, mark):
     """Create a searchable PDF from a pile of HOCR + IMAGE."""
-    load_invisible_font()
+    if (viewtxt):
+        pdfmetrics.registerFont(TTFont(nfont, nfont+'.ttf'))
+    else:
+        load_invisible_font()
     if outfile == '':
         pdf = Canvas(StdoutWrapper(), pageCompression=1)
     else:
@@ -79,12 +80,11 @@ def export_pdf(playground, default_dpi, hocrext,
             except BaseException:
                 sys.stderr.write(
                     'image ' + image + ' no draw, only HOCR in page\n')
-        add_text_layer(pdf, hocrext, image, height, dpi, viewmark)
+        add_text_layer(pdf, hocrext, nfont, image, height, dpi, viewtxt, mark)
         pdf.showPage()
     pdf.save()
 
-
-def add_text_layer(pdf, hocrext, image, height, dpi, viewmark):
+def add_text_layer(pdf, hocrext, nfont, image, height, dpi, viewtxt, mark):
     """Draw an invisible text layer for OCR data."""
     p1 = re.compile('bbox((\s+\d+){4})')
     p2 = re.compile('baseline((\s+[\d\.\-]+){2})')
@@ -98,6 +98,14 @@ def add_text_layer(pdf, hocrext, image, height, dpi, viewmark):
             baseline = [0, 0]
         linebox = [float(i) for i in linebox]
         baseline = [float(i) for i in baseline]
+        text_height = round((linebox[3] - linebox[1]) * 72.0 / dpi + 0.5)
+        if (mark):
+            mbox_x = round(linebox[0] * 72.0 / dpi, 3)
+            mbox_y = round(height - linebox[3] * 72.0 / dpi, 3)
+            mbox_width = round((linebox[2] - linebox[0]) * 72.0 / dpi, 3)
+            mbox_height = round((linebox[3] - linebox[1]) * 72.0 / dpi, 3)
+            pdf.setStrokeColorRGB(0.2,0.5,0.3)
+            pdf.rect(mbox_x,mbox_y,mbox_width,mbox_height)
         xpath_elements = './/*[@class="ocrx_word"]'
         if (not(line.xpath('boolean(' + xpath_elements + ')'))):
             # if there are no words elements present,
@@ -107,31 +115,27 @@ def add_text_layer(pdf, hocrext, image, height, dpi, viewmark):
             rawtext = word.text_content().strip()
             if rawtext == '':
                 continue
-            font_width = pdf.stringWidth(rawtext, 'invisible', 8)
-            if font_width <= 0:
-                continue
             box = p1.search(word.attrib['title']).group(1).split()
             box = [float(i) for i in box]
-            b = polyval(
-                baseline,
-                (box[0] + box[2]) / 2 - linebox[0]) + linebox[3]
-            text = pdf.beginText()
-            text.setTextRenderMode(3)  # double invisible
-            text.setFont('invisible', 8)
+            b = polyval(baseline, (box[0] + box[2]) / 2 - linebox[0]) + linebox[3]
             box_x = round(box[0] * 72.0 / dpi, 3)
             box_y = round(height - b * 72.0 / dpi, 3)
-            text.setTextOrigin(
-                box_x,
-                box_y)
             box_width = round((box[2] - box[0]) * 72.0 / dpi, 3)
             box_height = round((box[3] - box[1]) * 72.0 / dpi, 3)
-            if (viewmark):
-                pdf.rect(
-                    box_x,
-                    box_y,
-                    box_width,
-                    box_height,
-                    fill=1)
+            if (viewtxt):
+                font_width = pdf.stringWidth(rawtext, nfont, text_height)
+            else:
+                font_width = pdf.stringWidth(rawtext, 'invisible', text_height)
+            if font_width <= 0:
+                continue
+            text = pdf.beginText()
+            if (viewtxt):
+                text.setTextRenderMode(0)
+                text.setFont(nfont, text_height)
+            else:
+                text.setTextRenderMode(3)  # double invisible
+                text.setFont('invisible', text_height)
+            text.setTextOrigin(box_x, box_y)
             text.setHorizScale(100.0 * box_width / font_width)
             text.textLine(rawtext)
             pdf.drawText(text)
@@ -143,7 +147,6 @@ def polyval(poly, x):
 # Glyphless variation of vedaal's invisible font retrieved from
 # http://www.angelfire.com/pr/pgpf/if.html, which says:
 # 'Invisible font' is unrestricted freeware. Enjoy, Improve, Distribute freely
-
 
 def load_invisible_font():
     font = """
@@ -173,7 +176,6 @@ CMGjwvxTsr74/f/F95m3TH9x8o0/TU//N+7/D/ScVcA=
     setattr(ttf, "name", "(invisible.ttf)")
     pdfmetrics.registerFont(TTFont('invisible', ttf))
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Create a searchable PDF from a pile of hOCR and IMAGES")
@@ -191,6 +193,13 @@ if __name__ == "__main__":
         type=str,
         default='hocr',
         help='ext input hOCR, default hocr')
+    parser.add_argument(
+        '-f',
+        '--font',
+        metavar='font',
+        type=str,
+        default='FreeSans',
+        help='visible font, default FreeSans')
     parser.add_argument(
         '-i',
         '--images',
@@ -219,7 +228,13 @@ if __name__ == "__main__":
         help='read dpi in images, default False')
     parser.add_argument(
         '-v',
-        '--viewmark',
+        '--viewtxt',
+        action='store_true',
+        default=False,
+        help='visible OCR text')
+    parser.add_argument(
+        '-m',
+        '--mark',
         action='store_true',
         default=False,
         help='visible marker OCR text')
@@ -231,8 +246,10 @@ if __name__ == "__main__":
         args.imgdir,
         args.dpi,
         args.ext,
+        args.font,
         args.images,
         args.outfile,
         args.nodraw,
         args.readdpi,
-        args.viewmark)
+        args.viewtxt,
+        args.mark)

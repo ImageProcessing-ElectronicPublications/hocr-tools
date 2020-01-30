@@ -1,6 +1,12 @@
 =======
 CHANGES
 =======
+1.2.1.5 (2020-01-30)
+"visible"
+
+ hocr-pdf:
+  -visible OCR text
+
 1.2.1.4 (2018-09-29)
 "visible"
 

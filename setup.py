@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-VERSION = '1.2.1.4'
+VERSION = '1.2.1.5'
 
 import glob
 from setuptools import setup
@@ -33,5 +33,5 @@ setup(
         'lxml',
         'reportlab',
     ],
-    scripts=[c for c in glob.glob("hocr-*")]
+    scripts=[c for c in glob.glob("scripts/hocr-*")]
 )
