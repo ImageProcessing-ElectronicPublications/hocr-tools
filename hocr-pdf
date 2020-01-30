@@ -52,7 +52,10 @@ class StdoutWrapper:
 def export_pdf(playground, default_dpi, hocrext,
                timgs, outfile, nodraw, readdpi, viewmark):
     """Create a searchable PDF from a pile of HOCR + IMAGE."""
-    load_invisible_font()
+    if (viewmark):
+        pdfmetrics.registerFont(TTFont('FreeSans', 'FreeSans.ttf'))
+    else:
+        load_invisible_font()
     if outfile == '':
         pdf = Canvas(StdoutWrapper(), pageCompression=1)
     else:
@@ -107,31 +110,29 @@ def add_text_layer(pdf, hocrext, image, height, dpi, viewmark):
             rawtext = word.text_content().strip()
             if rawtext == '':
                 continue
-            font_width = pdf.stringWidth(rawtext, 'invisible', 8)
-            if font_width <= 0:
-                continue
             box = p1.search(word.attrib['title']).group(1).split()
             box = [float(i) for i in box]
-            b = polyval(
-                baseline,
-                (box[0] + box[2]) / 2 - linebox[0]) + linebox[3]
-            text = pdf.beginText()
-            text.setTextRenderMode(3)  # double invisible
-            text.setFont('invisible', 8)
+            b = polyval(baseline, (box[0] + box[2]) / 2 - linebox[0]) + linebox[3]
             box_x = round(box[0] * 72.0 / dpi, 3)
             box_y = round(height - b * 72.0 / dpi, 3)
-            text.setTextOrigin(
-                box_x,
-                box_y)
             box_width = round((box[2] - box[0]) * 72.0 / dpi, 3)
             box_height = round((box[3] - box[1]) * 72.0 / dpi, 3)
+            text_height = round((linebox[3] - linebox[1]) * 72.0 / dpi, 3)
+            print(str(text_height))
             if (viewmark):
-                pdf.rect(
-                    box_x,
-                    box_y,
-                    box_width,
-                    box_height,
-                    fill=1)
+                font_width = pdf.stringWidth(rawtext, 'FreeSans', text_height)
+            else:
+                font_width = pdf.stringWidth(rawtext, 'invisible', text_height)
+            if font_width <= 0:
+                continue
+            text = pdf.beginText()
+            if (viewmark):
+                text.setTextRenderMode(0)
+                text.setFont('FreeSans', text_height)
+            else:
+                text.setTextRenderMode(3)  # double invisible
+                text.setFont('invisible', text_height)
+            text.setTextOrigin(box_x, box_y)
             text.setHorizScale(100.0 * box_width / font_width)
             text.textLine(rawtext)
             pdf.drawText(text)
