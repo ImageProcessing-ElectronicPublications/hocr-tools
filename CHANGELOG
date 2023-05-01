@@ -1,6 +1,12 @@
 =======
 CHANGES
 =======
+1.2.2.1 (2023-05-02)
+"synonym"
+
+ hocr-pdf:
+  -synonym 'line' (python + python3)
+
 1.2.1.5 (2020-01-30)
 "visible"
 
