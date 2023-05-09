@@ -90,7 +90,7 @@ def add_text_layer(pdf, hocrext, nfont, image, height, dpi, viewtxt, mark):
     p2 = re.compile('baseline((\s+[\d\.\-]+){2})')
     hocrfile = os.path.splitext(image)[0] + "." + hocrext
     hocr = etree.parse(hocrfile, html.XHTMLParser())
-    for line in hocr.xpath('//*[@class="ocr_line" or @class="ocr_header" or @class="ocr_textfloat"]'):
+    for line in hocr.xpath('//*[@class="ocr_line" or @class="ocr_header" or @class="ocr_caption" or @class="ocr_textfloat"]'):
         linebox = p1.search(line.attrib['title']).group(1).split()
         try:
             baseline = p2.search(line.attrib['title']).group(1).split()
